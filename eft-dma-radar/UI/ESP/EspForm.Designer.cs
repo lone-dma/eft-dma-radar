@@ -54,7 +54,7 @@
             MinimizeBox = false;
             Name = "EspForm";
             Text = "ESP";
-            TopMost = true;
+            TopMost = false;
             ResumeLayout(false);
         }
 
