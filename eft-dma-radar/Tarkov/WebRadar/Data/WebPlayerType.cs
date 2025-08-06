@@ -3,7 +3,7 @@
     /// <summary>
     /// Defines Player Unit Type (Player,PMC,Scav,etc.)
     /// </summary>
-    public enum WebPlayerType : int
+    public enum WebPlayerType
     {
         /// <summary>
         /// Bot Player.

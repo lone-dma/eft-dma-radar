@@ -9,7 +9,7 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
         /// Update version (used for ordering).
         /// </summary>
         [Key(0)]
-        public uint Version { get; set; } = 0;
+        public ulong Version { get; set; } = 0;
         /// <summary>
         /// True if In-Game, otherwise False.
         /// </summary>
@@ -25,14 +25,5 @@ namespace eft_dma_radar.Tarkov.WebRadar.Data
         /// </summary>
         [Key(3)]
         public IEnumerable<WebRadarPlayer> Players { get; set; } = null;
-
-        [Key(4)]
-        public IEnumerable<WebRadarLoot> Loot { get; set; }
-
-        [Key(5)]
-        public DateTime SendTime { get; set; }
-
-        [Key(6)]
-        public IEnumerable<WebRadarDoor> Doors { get; set; } = null;
     }
 }

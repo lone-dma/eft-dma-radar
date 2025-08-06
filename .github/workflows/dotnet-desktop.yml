@@ -1,0 +1,109 @@
+name: .NET Desktop CI/CD
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repo (clean)
+        uses: actions/checkout@v4
+        with:
+          clean: true
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Dotnet Publish
+        run: |
+          dotnet publish eft-dma-radar\eft-dma-radar.csproj `
+            -c Release `
+            -r win-x64 `
+            -o "build\" `
+            --no-self-contained `
+            /p:PublishSingleFile=true `
+            /p:AssemblyVersion=${{ vars.FILE_VERSION }}.${{ github.run_number }} `
+            /p:Version=${{ vars.FILE_VERSION }}.${{ github.run_number }}
+
+      - name: Upload binaries artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-app
+          path: build\
+
+  publish:
+    needs: build
+    permissions:
+      contents: read #This is required for actions/checkout
+    runs-on: self-hosted
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+          path: artifact\
+
+      - name: Copy to local client path
+        shell: pwsh
+        run: |
+          Copy-Item -Path "artifact\*" `
+                    -Destination "${{ vars.LOCAL_CLIENT_PATH }}" `
+                    -Recurse -Force
+
+      - name: Prepare staging directory
+        shell: pwsh
+        run: |
+          if (-not (Test-Path staging)) {
+            New-Item staging -ItemType Directory | Out-Null
+          }
+
+      - name: Compress files for upload
+        run: |
+          7z a `
+            "staging\eft-dma-radar.zip" `
+            ".\artifact\*" `
+            -peft -r -aoa
+
+      - name: Publish to Azure Storage
+        shell: pwsh
+        run: |
+          az storage blob upload `
+            --connection-string "${{ secrets.AZ_STORAGE_CONNSTR }}" `
+            --container-name public `
+            --name "downloads/eft-dma-radar.zip" `
+            --file "staging\eft-dma-radar.zip" `
+            --overwrite
+ 
+  wrap-up:
+    needs: publish
+    runs-on: self-hosted
+    steps:
+      - name: Post webhook to Discord
+        shell: pwsh
+        run: |
+          $ts   = (Get-Date).ToString("o")
+          $runN = $env:GITHUB_RUN_NUMBER
+          $payload = @{
+            embeds = @(
+              @{
+                title       = "Build Complete: ${{ github.event.repository.name }} ($env:GITHUB_REF_NAME)"
+                description = "Run Number: $runN`nRun ID: $env:GITHUB_RUN_ID"
+                timestamp   = $ts
+                color       = 5763719
+                footer      = @{ text = "GitHub Actions" }
+              }
+            )
+          } | ConvertTo-Json -Depth 4
+
+          Invoke-RestMethod -Uri ${{ secrets.DISCORD_WEBHOOK_URL }} `
+            -Method Post `
+            -Body $payload `
+            -ContentType 'application/json' `
+            -ErrorAction Continue
+
+          Write-Host "✅ Discord notified (best-effort) for Run $runN"
